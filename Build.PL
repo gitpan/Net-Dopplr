@@ -9,7 +9,7 @@ my $build = Module::Build
                           'LWP::UserAgent'        => 0,
                           'URI'                   => 0,
                           'JSON::Any'             => 0,
-                          'Net::Google::AuthSub'  => '0.2',
+                          'Net::Google::AuthSub'  => '0.3',
                         },
          create_makefile_pl => 'traditional',
        );

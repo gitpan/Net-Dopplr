@@ -7,7 +7,7 @@ WriteMakefile
           'PREREQ_PM' => {
                            'JSON::Any' => '0',
                            'LWP::UserAgent' => '0',
-                           'Net::Google::AuthSub' => '0.2',
+                           'Net::Google::AuthSub' => '0.3',
                            'Test::More' => '0.62',
                            'URI' => '0'
                          },

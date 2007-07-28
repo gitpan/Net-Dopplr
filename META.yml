@@ -1,6 +1,6 @@
 ---
 name: Net-Dopplr
-version: 0.1
+version: 0.2
 author:
   - 'Simon Wistow <simon@thegestalt.org>'
 abstract: interface with Dopplr.com's web service
@@ -8,13 +8,13 @@ license: unknown
 requires:
   JSON::Any: 0
   LWP::UserAgent: 0
-  Net::Google::AuthSub: 0.2
+  Net::Google::AuthSub: 0.3
   Test::More: 0.62
   URI: 0
 provides:
   Net::Dopplr:
     file: lib/Net/Dopplr.pm
-    version: 0.1
+    version: 0.2
 generated_by: Module::Build version 0.2801
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

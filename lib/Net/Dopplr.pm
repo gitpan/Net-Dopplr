@@ -7,7 +7,7 @@ use URI;
 use LWP::UserAgent;
 use HTTP::Request::Common;
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 our $AUTOLOAD;
 
 =head1 NAME
@@ -39,20 +39,18 @@ You can then upgrade this to a permanent session token.
 I use this script.
 
     use strict;
-    use Net::Dopplr;
     use Net::Google::AuthSub;
-    use LWP::UserAgent;
 
-    my $ua = LWP::UserAgent->new;
     my $token = shift;
     my $sess;
     if (!defined $sess) {
-                my $auth = Net::Google::AuthSub->new( url => 'https://www.dopplr.com/api', _bug_compat => 'dopplr');
+                my $auth = Net::Google::AuthSub->new( url => 'https://www.dopplr.com/api');
                 $auth->auth('null', $token);
-                $sess    = $auth->session_token();
+                $sess    = $auth->session_token() || die "Couldn't get token: $@";
                 print "Session token = $sess\n";
     }
 
+    # then later
     my $dopplr = Net::Dopplr->new($sess);
 
 You can then use the session token from that point forward.
@@ -78,7 +76,7 @@ sub new {
     my $url   = 'https://www.dopplr.com/api';
     my $ua    = LWP::UserAgent->new;
     my $json  = JSON::Any->new;
-    my $auth  = Net::Google::AuthSub->new(url => $url, _bug_compat => 'dopplr');
+    my $auth  = Net::Google::AuthSub->new(url => $url);
     $auth->auth('null', $token);
 
     return bless { _auth => $auth, _ua => $ua, _json => $json, _url => $url }, $class;
@@ -87,6 +85,7 @@ sub new {
 sub AUTOLOAD {
     my $self = shift;
     my $key  = shift;
+    my %opts = @_;
 
     my $type = ref($self)
             or die "$self is not an object";
@@ -98,7 +97,7 @@ sub AUTOLOAD {
 
     my $uri = URI->new($self->{_url});
     $uri->path($uri->path."/$name/$key");
-    $uri->query_form( format => 'js' );
+    $uri->query_form( format => 'js', %opts );
 
     my %params = $self->{_auth}->auth_params();
     my $req    = POST "$uri", %params ;
