@@ -4,6 +4,7 @@ use Module::Build;
 my $build = Module::Build
   ->new( module_name  => "Net::Dopplr",
          version_from => 'lib/Net/Dopplr.pm',
+         script_files => [ 'bin/dopplr' ],
          requires     => {
                           'Test::More'            => '0.62',
                           'LWP::UserAgent'        => 0,

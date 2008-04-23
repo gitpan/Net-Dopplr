@@ -12,7 +12,9 @@ WriteMakefile
                            'URI' => '0'
                          },
           'INSTALLDIRS' => 'site',
-          'EXE_FILES' => [],
+          'EXE_FILES' => [
+                           'bin/dopplr'
+                         ],
           'PL_FILES' => {}
         )
 ;

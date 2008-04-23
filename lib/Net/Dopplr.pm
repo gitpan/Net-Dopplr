@@ -1,13 +1,14 @@
 package Net::Dopplr;
 
 use strict;
+use Carp;
 use Net::Google::AuthSub;
 use JSON::Any;
 use URI;
 use LWP::UserAgent;
 use HTTP::Request::Common;
 
-our $VERSION = '0.5';
+our $VERSION = '0.6';
 our $AUTOLOAD;
 
 =head1 NAME
@@ -34,9 +35,8 @@ First visit this URL
 
 (Or you can replace next with you own web app). That will give you a developer token. 
 
-You can then upgrade this to a permanent session token.
-
-I use this script.
+You can then upgrade this to a permanent session token using the C<dopplr> 
+utility shipped with this module or code similar to this
 
     use strict;
     use Net::Google::AuthSub;
@@ -101,6 +101,8 @@ my %methods = (
     search                  => 'search',
     city_search             => 'search',
     traveller_search        => 'search',
+
+    tips                    => 'tip',
 );
 
 my %key_names = (
@@ -108,6 +110,7 @@ my %key_names = (
     trip      => 'trip_id',
     city      => 'geoname_id',
     search    => 'q',
+    tip       => 'geoname_id',
 );
 
 
@@ -115,7 +118,8 @@ my %post = map { $_ => 1 } qw(add_trip_tags
                               add_trip_note 
                               delete_trip
                               add_trip
-                              update_traveller);
+                              update_traveller
+                              add_tip);
 sub AUTOLOAD {
     my $self = shift;
 
@@ -132,8 +136,9 @@ sub AUTOLOAD {
     } else {
         my $key  = $key_names{$type};
         my $val  = shift @_;
+        croak "You must pass a $key to this method" unless defined $val;
         my %opts = @_;
-        $self->_do($name, $key => $val, %opts);
+        $self->call($name, { $key => $val, %opts });
     }
 }
 
@@ -142,40 +147,10 @@ sub _traveller {
     my $name = shift;
     my $val  = shift;
     my %opts = (defined $val)? ( traveller => $val ) : ();
-    $self->_do($name, %opts);     
-}
-
-sub _do {
-    my $self = shift;
-    my $name = shift;
-
-    my %opts = @_;
-    my $type = ($post{$name})? "POST" : "GET";
-
-    $opts{format} = 'js';
-
-    my $uri = URI->new($self->{_url});
-    $uri->path($uri->path."/$name");
-    my %params = $self->{_auth}->auth_params();
-	my $req;
-	if ("POST" eq $type) {
-		$req = POST "$uri", [%opts], %params;
-	} else { 
-		$uri->query_form(%opts);
-		$req = GET "$uri", %params;
-	}
-	
-    my $res    = $self->{_ua}->request($req);
-    die "Couldn't call $name : ".$res->status_line unless $res->is_success;
-
-    return    $self->{_json}->decode($res->content);
+    $self->call($name, { %opts });     
 }
 
 
-
-
-
-sub DESTROY { }
 
 =head1 TRAVELLER METHODS
 
@@ -243,11 +218,11 @@ the logged-in user.
 
 sub tag {
     my $self      = shift;
-    my $tag       = shift;
+    my $tag       = shift || croak "You must pass a tag to this method";
     my $traveller = shift;
     my %opts      = ( tag => $tag );
     $opts{traveller} = $traveller if defined $traveller;
-    $self->_do('tag', %opts);
+    $self->call('tag', { %opts });
 }
 
 =head2 location_on_date <date> [traveller]
@@ -265,11 +240,11 @@ the logged-in user.
 
 sub location_on_date {
     my $self      = shift;
-    my $date      = shift;
+    my $date      = shift || croak "You must pass a date to this method";
     my $traveller = shift;
     my %opts      = ( date => $date );
     $opts{traveller} = $traveller if defined $traveller;
-    $self->_do('location_on_date', %opts);
+    $self->call('location_on_date', { %opts });
 }
 
 =head1 TRIP METHODS
@@ -290,10 +265,11 @@ Add tags to a trip.
 
 sub add_trip_tags {
     my $self    = shift;
-    my $trip_id = shift;
-    my $tags    = join(" ", @_);
+    my $trip_id = shift || croak "You must pass a trip id to this method";
+    my $tags    = join(" ", @_); 
+    croak "You must pass at least one tag" unless length $tags;
     my %opts    = ( trip_id => $trip_id, tags => $tags );
-    $self->_do('add_trip_tags', %opts);
+    $self->call('add_trip_tags', { %opts });
 }
 
 =head2 add_trip_note <trip id> <note>
@@ -304,10 +280,10 @@ Add a note to a trip.
 
 sub add_trip_note {
     my $self    = shift;
-    my $trip_id = shift;
-    my $note    = shift;
+    my $trip_id = shift || croak "You must pass a trip id to this method";
+    my $note    = shift || croak "You must pass a note body to this method";
     my %opts    = ( trip_id => $trip_id, body => $note );
-    $self->_do('add_trip_note', %opts);
+    $self->call('add_trip_note', { %opts });
 }
 
 =head2 delete_trip <trip_id>
@@ -343,12 +319,11 @@ Dates should be in ISO date format e.g
 
 sub add_trip {
     my $self   = shift;
-    my $geo_id = shift;
-    my $start  = shift;
-    my $finish = shift;
+    my $geo_id = shift || croak "You must pass a geoname id to this method";
+    my $start  = shift || croak "You must pass a start date to this method";
+    my $finish = shift || croak "You must pass a finish date to this method";
     my %opts   = ( geoname_id => $geo_id, start => $start, finish => $finish );
-    $self->_do('add_trip', %opts); 
-
+    $self->call('add_trip', { %opts }); 
 }
 
 =head1 SEARCH METHODS
@@ -365,11 +340,46 @@ Searches for cities.
 
 =cut
 
-=head2 <term>
+=head2 traveller_search <term>
 
 Searches for travellers.
 
 =cut
+
+
+=head1 TIP METHODS
+
+=head2 tips <geoname_id>
+
+Get tips for a city. The returned tips will be tips that can be 
+seen by the currently authenticated user, so may include private 
+tips that only this user can see, as well as public tips on the city.
+
+=cut
+
+=head2 add_tip <geoname_id> <title> <review> [opt[s]]
+
+Add a tip for a city. The response is the tip you just added.
+
+Opts is a hash where the keys can be 
+
+    public 
+    url
+    address
+    tags
+
+See http://dopplr.pbwiki.com/method%3Aadd_tip for more details.
+
+=cut
+
+sub add_tip {
+    my $self   = shift;
+    my $geo_id = shift || croak "You must pass a geoname id to this method";
+    my $title  = shift || croak "You must pass a start date to this method";
+    my $review = shift || croak "You must pass a finish date to this method";
+    my %opts   = ( @_, geoname_id => $geo_id, title => $title, review => $review );
+    $self->call('add_tip', { %opts });
+}
 
 =head1 OTHER METHODS
 
@@ -389,8 +399,67 @@ Takes a hash with the new values. Possible keys are
 sub update_traveller {
     my $self = shift;
     my %opts = @_;
-    $self->_do('update_traveller', %opts);
+    $self->call('update_traveller', { %opts });
 }
+
+=head1 GENERIC, FUTURE PROOF METHOD CALLING
+
+=head2 call <name> <opts> [post]
+
+This is the future proofing method. 
+
+If there's any method I haven't implemented yet then 
+you can simply provide the name of the method, the 
+options as a hash ref and, optionally, whether it  
+should be a POST request or not. So, for a theoretical
+new method called C<throw_penguin> which throws a 
+penguin at a traveller and is called as a POST
+
+    $dopplr->call('throw_penguin', { traveller_id => $id }, 1);
+
+and for C<get_penguins> which finds how many penguins have been 
+thrown at a traveller and is called as a GET
+
+    use Data::Dumper;
+    my $data = $dopplr->call('get_penguins', { traveller_id => $id });
+    print Dumper($data);
+
+=cut
+
+sub call {
+    my $self = shift;
+    my $name = shift;
+    my $opts = shift;
+    my $post = shift;
+    my $type;
+    if (defined $post) {
+        $type =  ($post)? "POST" : "GET";
+    } else {
+        $type =  ($post{$name})? "POST" : "GET";
+    }
+
+    $opts->{format} = 'js';
+
+    my $uri = URI->new($self->{_url});
+    $uri->path($uri->path."/$name");
+    my %params = $self->{_auth}->auth_params();
+    my $req;
+    if ("POST" eq $type) {
+        $req = POST "$uri", [%$opts], %params;
+    } else { 
+        $uri->query_form(%$opts);
+        $req = GET "$uri", %params;
+    }
+    
+    my $res    = $self->{_ua}->request($req);
+    die "Couldn't call $name : ".$res->status_line unless $res->is_success;
+
+    return    $self->{_json}->decode($res->content);
+}
+
+sub DESTROY { }
+
+
 
 =head1 AUTHOR
 
