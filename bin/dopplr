@@ -101,7 +101,7 @@ unless ($tokens{session_token}) {
 # create the Dopplr object
 my $dopplr = Net::Dopplr->new( $tokens{session_token} );
 
-my $method = shift @ARGV || "trips_info";
+my $method = shift @ARGV || "future_trips_info";
 my %opts   = get_options();
 
 
@@ -136,8 +136,10 @@ $transforms{traveller_info} = $transforms{update_traveller} = sub {
 $transforms{trips_info} = $transforms{future_trips_info} = sub {
     my $data  = shift;
     my $count = 1;
-    foreach my $trip (@{$data->{trip}}) {
-        print "$count) ";
+    my @trips = @{$data->{trip}};
+    my $len   = length(scalar(@trips))+1;
+    foreach my $trip (@trips) {
+        printf "% ${len}d) ", $count;
         _print_trip($trip);
         $count++;
     }
@@ -260,7 +262,9 @@ $transforms{tips} = sub {
 
 
 
-
+if ('help' eq $method) {
+	error("Commands are: ".join(", ", keys %transforms));
+} 
 
 my $data   = eval { $dopplr->call($method, {%opts}) };
 error("$@") if $@;
@@ -309,7 +313,7 @@ sub fetch_config {
 
 sub error {
     my $msg = shift;
-    die "Usage: dopplr token=<token> [session_token=<session token>] [command [opt[s]]\n".
+    die "Usage: dopplr [token=<token>] [session_token=<session token>] [command [opt[s]]\n".
         "$msg\n"."\n\n".
         "See man page for details: perldoc dopplr or man dopplr\n";
 }

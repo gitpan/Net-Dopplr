@@ -8,7 +8,7 @@ use URI;
 use LWP::UserAgent;
 use HTTP::Request::Common;
 
-our $VERSION = '0.6';
+our $VERSION = '0.7';
 our $AUTOLOAD;
 
 =head1 NAME
@@ -71,8 +71,8 @@ Requires a developer token or a session token.
 sub new {
     my $class = shift;
     my $token = shift;
-
-    my $url   = 'https://www.dopplr.com/api';
+    my %opts  = @_;
+    my $url   = $opts{url} || 'https://www.dopplr.com/api';
     my $ua    = LWP::UserAgent->new;
     my $json  = JSON::Any->new;
     my $auth  = Net::Google::AuthSub->new(url => $url);
@@ -94,9 +94,11 @@ my %methods = (
     add_trip_tags           => 'trip',
     add_trip_note           => 'trip',
     delete_trip             => 'trip',
+    trip_coincidences       => 'trip',
 
     city_info               => 'city',
     add_trip                => 'city',
+    trips_to_city           => 'city',
 
     search                  => 'search',
     city_search             => 'search',
@@ -136,6 +138,10 @@ sub AUTOLOAD {
     } else {
         my $key  = $key_names{$type};
         my $val  = shift @_;
+        if ('woeid' eq $val) {
+            $key = $val;
+            $val = shift @_;
+        }
         croak "You must pass a $key to this method" unless defined $val;
         my %opts = @_;
         $self->call($name, { $key => $val, %opts });
@@ -257,6 +263,13 @@ Get info about a specific trip.
 
 =cut
 
+=head2 trip_coincidences <trip id>
+
+Get coincidences for a given trip.
+
+=cut
+
+
 =head2 add_trip_tags <trip id> <tag[s]>
 
 Add tags to a trip.
@@ -301,7 +314,11 @@ Delete a trip
 
 Get info about a City.
 
-Use search to get the geoname id.
+Use search to get the geoname id. 
+
+Alternatively pass in a woeid using
+
+    $dopplr->city_info( woeid => $woeid );
 
 =cut
 
@@ -311,6 +328,10 @@ Add a trip for the currently logged in user.
 
 Use search to get the geoname id.
 
+Alternatively pass in a woeid using
+
+    $dopplr->add_trip( woeid => $woeid, $start, $finish );
+
 Dates should be in ISO date format e.g
 
     2007-04-01
@@ -318,13 +339,25 @@ Dates should be in ISO date format e.g
 =cut
 
 sub add_trip {
-    my $self   = shift;
-    my $geo_id = shift || croak "You must pass a geoname id to this method";
-    my $start  = shift || croak "You must pass a start date to this method";
-    my $finish = shift || croak "You must pass a finish date to this method";
-    my %opts   = ( geoname_id => $geo_id, start => $start, finish => $finish );
+    my $self     = shift;
+    my $use_woe  = 0;
+    my $id       = shift || croak "You must pass a geoname id to this method";
+    if ( 'woeid' eq $id ) { 
+        $use_woe = 1;
+        $id      = shift || croak "You must pass in a woe id to this method";
+    } 
+    my $start    = shift || croak "You must pass a start date to this method";
+    my $finish   = shift || croak "You must pass a finish date to this method";
+    my %opts     = ( start => $start, finish => $finish );
+    $opts{($use_woe)? 'woeid' : 'geoname_id'} = $id; 
     $self->call('add_trip', { %opts }); 
 }
+
+=head2 trips_to_city <geoname id>
+
+Get all your fellow travellers trips to a given city.
+
+=cut
 
 =head1 SEARCH METHODS
 
@@ -355,6 +388,10 @@ Get tips for a city. The returned tips will be tips that can be
 seen by the currently authenticated user, so may include private 
 tips that only this user can see, as well as public tips on the city.
 
+Alternatively pass in a woeid using
+
+    $dopplr->tips( woeid => $woeid );
+
 =cut
 
 =head2 add_tip <geoname_id> <title> <review> [opt[s]]
@@ -368,16 +405,26 @@ Opts is a hash where the keys can be
     address
     tags
 
+Alternatively pass in a woeid using
+
+    $dopplr->add_tip( woeid => $woeid, $title, $review, %opts );
+
 See http://dopplr.pbwiki.com/method%3Aadd_tip for more details.
 
 =cut
 
 sub add_tip {
-    my $self   = shift;
-    my $geo_id = shift || croak "You must pass a geoname id to this method";
-    my $title  = shift || croak "You must pass a start date to this method";
-    my $review = shift || croak "You must pass a finish date to this method";
-    my %opts   = ( @_, geoname_id => $geo_id, title => $title, review => $review );
+    my $self     = shift;
+    my $use_woe  = 0;
+    my $id       = shift || croak "You must pass a geoname id to this method";
+    if ( 'woeid' eq $id ) { 
+        $use_woe = 1;
+        $id      = shift || croak "You must pass in a woe id to this method";
+    } 
+    my $title   = shift || croak "You must pass a start date to this method";
+    my $review  = shift || croak "You must pass a finish date to this method";
+    my %opts    = ( @_, title => $title, review => $review );
+    $opts{($use_woe)? 'woeid' : 'geoname_id'} = $id; 
     $self->call('add_tip', { %opts });
 }
 

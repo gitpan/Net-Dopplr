@@ -1,3 +1,11 @@
+- 0.7 19th July 2008
+Make default dopplr command 'future_trips_info' as the docs say
+Make output look nicer
+Add help command
+Add trip_coincidences
+Add trips_to_city
+Add ability to use woieid on trips and tips methods
+
 - 0.6 22nd April 2008
 Add tip* methods
 Expose ability to call any Dopplr method, raw
